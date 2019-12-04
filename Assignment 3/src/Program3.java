@@ -23,8 +23,12 @@ class Solution {
 //    private final int minCoins[][];
     private final int length;
 
-    public static final int MAX_WORST = Integer.MIN_VALUE;
-    public static final int MIN_WORST = Integer.MAX_VALUE;
+
+    private final int[][] MAX;
+    //private final int[][] MIN;
+
+    private static final int MAX_WORST = Integer.MIN_VALUE;
+    private static final int MIN_WORST = Integer.MAX_VALUE;
 
     public Solution(int[] cities) {
         this.cities = cities;
@@ -38,19 +42,24 @@ class Solution {
             }
         }
         citySums = new int[length+1][length+1];
+
+        MAX = new int[length+1][length+1];
     }
     public int solve(){
         findSums();
-        return maximize(0,length, false);
-        //return alphaBetaMax(0,0,length, false, MAX_WORST, MIN_WORST);
+
+        int initCollectGold = citySums[0][length];
+//        return maximize(0,length) - initCollectGold;
+        return alphaBetaMax(0,0,length, MIN_WORST) - initCollectGold;
+//        return solveIterative() - initCollectGold;
     }
 
-    private int maximize(int left, int right, boolean collectGold){
+    private int maximize(int left, int right){
         if(right<left){
             throw new IllegalArgumentException("Invalid left and right values for the given city.");
         }
 
-        int collectedGold = collectGold? citySums[left][right]: 0;
+        int collectedGold = citySums[left][right];
 
         //no cities left
         if(right-left==0){
@@ -83,12 +92,12 @@ class Solution {
 
         //attack from the west
         {
-            int coins = maximize(wall+1,right, true);
+            int coins = maximize(wall+1,right);
             minCoins = Math.min(minCoins, coins);
         }
         //attack from the east
         {
-            int coins = maximize(left,wall+1, true);
+            int coins = maximize(left,wall+1);
             minCoins = Math.min(minCoins, coins);
         }
         return minCoins;
@@ -119,12 +128,12 @@ class Solution {
 
     //alpha is the minimum score king is guaranteed of
     //beta is the maximum score the enemy is guaranteed of
-    private int alphaBetaMax(int depth, int left, int right, boolean collectGold, int alpha, int beta){
+    private int alphaBetaMax(int depth, int left, int right, int minValSoFar){
         if(right<left){
             throw new IllegalArgumentException("Invalid left and right values for the given city.");
         }
 
-        int collectedGold = collectGold? citySums[left][right]: 0;
+        int collectedGold = citySums[left][right];
 
         //no cities left
         if(right-left==0){
@@ -142,60 +151,101 @@ class Solution {
 
         //if not computed yet
         if(maxCoins[left][right]==MAX_WORST){
-            int maxVal = MAX_WORST;
+            int maxValSoFar = MAX_WORST;
 
             //wall variable is the index directly left of wall
             //bounds: wall can be left, wall can be right-2 (because right-1 is the rightmost index)
 
-            alpha = maxVal + collectedGold;
-            for(int wall=left;wall<right-1;wall++){
+//            for(int wall=left;wall<right-1;wall++){
+            for(int wall=right-2;wall>=left;wall--){
                 //put wall at the wall index
-                int calcVal = alphaBetaMin(depth+1, left, right, wall, alpha, beta);
-                maxVal = Math.max(maxVal, calcVal);
-                alpha = Math.max(alpha, maxVal+collectedGold);
-                if(alpha>=beta){
+                int childVal = alphaBetaMin(depth+1, left, right, wall, maxValSoFar);
+                maxValSoFar = Math.max(maxValSoFar, childVal);
+
+                if(maxValSoFar>=minValSoFar){
                     //then our nodes don't matter.
-                    break;
+
+                    return collectedGold+maxValSoFar;
                 }
             }
-            maxCoins[left][right] = maxVal+collectedGold;
+            maxCoins[left][right] = collectedGold+maxValSoFar;
         }
 
         return maxCoins[left][right];
     }
-    private int alphaBetaMin(int depth, int left, int right, int wall, int alpha, int beta){
+    private int alphaBetaMin(int depth, int left, int right, int wall, int maxValSoFar){
         //either attack from the west or the east
-        int minCoins = MIN_WORST;
+        //this nodes value
+        int minValSoFar = MIN_WORST;
 
         //parent call is maximizing. The alpha value passed in is the "best value" the parent has seen so far.
         //if our values ever becomes less than the alpha it has seen (we are going lesser and lesser from here),
         //then our values will not be considered by the parent, not worth it for him.
         ///we are minimizing the child nodes.
 
-        beta = minCoins;
+
+        //attack from the east
+        {
+            int childVal = alphaBetaMax(depth+1, left,wall+1, minValSoFar);
+            minValSoFar = Math.min(minValSoFar, childVal);
+
+            if(maxValSoFar>=minValSoFar){
+                return minValSoFar;
+            }
+        }
 
         //attack from the west
         {
-            int coins = alphaBetaMax(depth+1, wall+1,right, true, alpha, beta);
-            minCoins = Math.min(minCoins, coins);
+            int childVal = alphaBetaMax(depth+1, wall+1,right, minValSoFar);
+            minValSoFar = Math.min(minValSoFar, childVal);
 
-            beta = Math.min(beta, minCoins);
-            if(alpha>=beta){
-                return minCoins;
+            if(maxValSoFar>=minValSoFar){
+                return minValSoFar;
             }
         }
-        //attack from the east
-        {
-            int coins = alphaBetaMax(depth+1, left,wall+1, true, alpha, beta);
-            minCoins = Math.min(minCoins, coins);
 
-            beta = Math.min(beta, minCoins);
-            if(alpha>=beta){
-                return minCoins;
-            }
-        }
-        return minCoins;
+        return minValSoFar;
     }
+
+    private int solveIterative(){
+        for(int right=0;right<=length;right++){
+            for(int left = right;left>=0;left--){
+                if(left>right){
+                    throw new RuntimeException("nope nope nope");
+                }
+                //no cities left
+                if(right-left==0){
+                    MAX[left][right] = 0;
+                }
+                //one city left
+                else if(right-left==1){
+                    MAX[left][right] = citySums[left][right];
+                }
+                else {
+                    MAX[left][right] = getVal(left, right);
+                }
+            }
+        }
+        return MAX[0][length];
+    }
+    private int getVal(int left, int right){
+        int maxVal = MAX_WORST;
+        for(int wall=left;wall<right-1;wall++){
+
+//            int childVal = alphaBetaMax(depth+1, left,wall+1, true, minValSoFar);
+//            int childVal = alphaBetaMax(depth+1, wall+1,right, true, minValSoFar);
+
+            int westattack = 0, eastattack = 0;
+            eastattack = MAX[left][wall+1];
+            westattack = MAX[wall+1][right];
+
+            int minVal = Math.min(westattack, eastattack);
+            maxVal = Math.max(maxVal, minVal);
+        }
+        return maxVal+citySums[left][right];
+    }
+
+
 }
 
 
