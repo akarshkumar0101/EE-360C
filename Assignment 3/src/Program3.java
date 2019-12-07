@@ -44,14 +44,17 @@ class Solution {
         citySums = new int[length+1][length+1];
 
         MAX = new int[length+1][length+1];
+
+//        n2ans = new int[length+1][length+1];
+//        n2runningmaxofmins = new int[length+1][length+1];
     }
     public int solve(){
         findSums();
 
         int initCollectGold = citySums[0][length];
 //        return maximize(0,length) - initCollectGold;
-        return alphaBetaMax(0,0,length, MIN_WORST) - initCollectGold;
-//        return solveIterative() - initCollectGold;
+//        return alphaBetaMax(0,0,length, MIN_WORST) - initCollectGold;
+        return solveIterative() - initCollectGold;
     }
 
     private int maximize(int left, int right){
@@ -230,18 +233,40 @@ class Solution {
     }
     private int getVal(int left, int right){
         int maxVal = MAX_WORST;
-        for(int wall=left;wall<right-1;wall++){
 
-//            int childVal = alphaBetaMax(depth+1, left,wall+1, true, minValSoFar);
-//            int childVal = alphaBetaMax(depth+1, wall+1,right, true, minValSoFar);
+        int binleft = left, binright = right-2;
 
-            int westattack = 0, eastattack = 0;
-            eastattack = MAX[left][wall+1];
-            westattack = MAX[wall+1][right];
+        while(true){
+            int mid = (binleft+binright)/2;
+            int midleft = mid-1, midright = mid+1;
 
-            int minVal = Math.min(westattack, eastattack);
-            maxVal = Math.max(maxVal, minVal);
+            int valLeft = Math.min(MAX[left][midleft+1],MAX[midleft+1][right]);
+            int valRight = Math.min(MAX[left][midright+1],MAX[midright+1][right]);
+            int val = Math.min(MAX[left][mid+1],MAX[mid+1][right]);
+
+            maxVal = Math.max(maxVal, val);
+            maxVal = Math.max(maxVal, valLeft);
+            maxVal = Math.max(maxVal, valRight);
+
+
+            if(val<valLeft && valRight<val){
+                //we are at decreasing point
+                //max is to our left
+                binright = mid;
+            }
+            else if(val>valLeft && valRight>val){
+                //we are at increasing point
+                //max is to our right
+                binleft = mid+1;
+            }
+            else{
+                break;
+            }
+            if(binleft==binright){
+                break;
+            }
         }
+
         return maxVal+citySums[left][right];
     }
 
